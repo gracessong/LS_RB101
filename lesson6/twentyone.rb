@@ -2,9 +2,9 @@
 
 # Data structure
 
-WHATEVER_ONE = 'Thirty-One'
-GAME_GOAL = 31
-DEALER_LIMIT = 27
+WHATEVER_ONE = 'Twenty-One'
+GAME_GOAL = 21
+DEALER_LIMIT = 17
 SUITS = %w(H C D S)
 VALUES = %w(2 3 4 5 6 7 8 9 10 J Q K A)
 
@@ -53,9 +53,13 @@ def total(cards)
   sum
 end
 
-# return winner
+# return winner 
 def who_won(dealer_total, player_total)
-  if GAME_GOAL - dealer_total < GAME_GOAL - player_total
+  if busted?(dealer_total)
+    :player
+  elsif busted?(player_total)
+    :dealer
+  elsif GAME_GOAL - dealer_total < GAME_GOAL - player_total
     :dealer
   elsif dealer_total == player_total
     :tie
@@ -73,6 +77,14 @@ def show_result(dealer_total, player_total)
   end
 end
 
+# end-of-round output
+def end_round(dealer_cards, player_cards, dealer_total, player_total)
+  puts "=================================================="
+  prompt "Dealer has #{convert_cards(dealer_cards)}, for a total of #{dealer_total}."
+  prompt "Player has #{convert_cards(player_cards)}, for a total of #{player_total}."
+  puts "=================================================="
+end
+
 # check if sum exceeds 21
 def busted?(total)
   total > GAME_GOAL
@@ -80,7 +92,7 @@ end
 
 # ask if play again
 def play_again?
-  prompt "=================================================="
+  puts "=================================================="
   prompt "Do you want to play again? (y/n)"
   answer = gets.chomp
   answer.downcase.start_with?('y')
@@ -88,24 +100,15 @@ end
 
 # display cards in a string
 def convert_cards(cards, punct = ", ") 
-  # [['H', '1']] => '1 of Hearts'
   # [['H', '1'], ['D', '2']] => '1 of Hearts and 2 of Diamonds'
   # [['H', '1'], ['D', '2'], ['S', 'A']] => '1 of Hearts, 2 of Diamonds, and Ace of Spades'
   str_cards = cards.map { |card| convert_card(card) }
+  str_cards.last.prepend('and ')
   
-  if cards.size == 1
-    str_cards.join
-  else
-    str_cards.last.prepend('and ')
-    if cards.size == 2
-      str_cards.join(" ")
-    else
-      str_cards.join(punct)
-    end
-  end
+  cards.size == 2 ? str_cards.join(" ") : str_cards.join(punct)
 end
 
-def convert_card(card) # ['H', '1'] => ['1 of Hearts']
+def convert_card(card) # ['H', '1'] => '1 of Hearts'
   card = card.map do |element|
           case element
           when 'H' then element.sub('H', 'Hearts')
@@ -122,13 +125,42 @@ def convert_card(card) # ['H', '1'] => ['1 of Hearts']
   card.reverse.join(" of ")
 end
 
+def tally_scores(score, dealer_total, player_total)
+  case who_won(dealer_total, player_total)
+  when :dealer then score[:dealer] += 1
+  when :player then score[:player] += 1
+  end
+end
+
+def grand_winner?(score)
+  score.values.include?(5)
+end
+
+def show_scoreboard(score)
+  score.each do |key, value|
+    prompt "#{key.to_s.capitalize}'s score is #{value}."
+  end
+end
+
+def show_grand_winner(score)
+  winner = score.select { |_, value| value == 5 }.keys
+  puts "=================================================="
+  case winner[0]
+  when :dealer then prompt "Dealer is the grand winner!"
+  when :player then prompt "You are the grand winner!"
+  end
+  puts "=================================================="
+end
+
 # game starts
 prompt "Welcome to the game of #{WHATEVER_ONE}!"
 prompt "Whoever wins 5 rounds first is the winner."
 prompt "Ready to play...?"
 sleep 1
 
-loop do
+round_score = {player: 0, dealer: 0}
+
+loop do # round
   prompt "Let's play."
 
   deck = initialize_deck
@@ -146,9 +178,9 @@ loop do
   prompt "The dealer has #{convert_card(dealer_cards.first)} and a unknown card."
   prompt "You have #{convert_cards(player_cards)}."
 
-  loop do
+  loop do # player turn
     player_answer = nil
-    loop do # player turn
+    loop do 
       prompt "Hit or stay?"
       player_answer = gets.chomp.downcase
       break if ['hit', 'stay'].include?(player_answer)
@@ -167,8 +199,12 @@ loop do
   end
 
   if busted?(player_total)
-    prompt "=================================================="
-    prompt "You busted, Dealer wins!"
+    end_round(dealer_cards, player_cards, dealer_total, player_total)
+    prompt "Oops, you busted."
+    show_result(dealer_total, player_total)
+    tally_scores(round_score, dealer_total, player_total)
+    show_scoreboard(round_score)
+    break if grand_winner?(round_score)
     play_again? ? next : break
   else
     prompt "You chose to stay at #{player_total}."
@@ -188,16 +224,24 @@ loop do
 
   # Compare cards, determine winner, display scores
   if busted?(dealer_total)
-    prompt "=================================================="
-    prompt "Dealer busted, You won!"
+    end_round(dealer_cards, player_cards, dealer_total, player_total)
+    prompt "Oops, dealer busted."
+    show_result(dealer_total, player_total)
+    tally_scores(round_score, dealer_total, player_total)
+    show_scoreboard(round_score)
+    break if grand_winner?(round_score)
     play_again? ? next : break
   else
     prompt "Dealer stays at #{dealer_total}."
-    prompt "=================================================="
-    show_result(dealer_total, player_total)
   end
 
+  end_round(dealer_cards, player_cards, dealer_total, player_total)
+  show_result(dealer_total, player_total)
+  tally_scores(round_score, dealer_total, player_total)
+  show_scoreboard(round_score)
+  break if grand_winner?(round_score)
   break unless play_again?
 end
 
+show_grand_winner(round_score)
 prompt "Good game. Good bye!"
